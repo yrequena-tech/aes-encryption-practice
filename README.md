@@ -260,7 +260,7 @@ The same encryption pattern can be applied to:
 | File | Description |
 |---|---|
 | `aes_practice.html` | Standalone AES-256-GCM encryption practice tool |
-| `CFA_Investigation_Tool.html` | Workplace investigation tracker (encryption integration pending) |
+| `Investigation_Tool.html` | Workplace investigation tracker (encryption integration pending) |
 
 ---
 
