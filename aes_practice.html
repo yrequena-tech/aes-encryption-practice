@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <title>AES-256 Practice</title>
+</head>
+<body>
+
+  <h1>AES-256-GCM Encryption Practice</h1>
+
+  <label>Password:</label><br>
+  <input type="password" id="password" placeholder="Enter a password"><br><br>
+
+  <label>Message to encrypt:</label><br>
+  <textarea id="plaintext" rows="4" cols="50" placeholder="Type something secret here"></textarea><br><br>
+
+  <button onclick="encryptData()"> Encrypt</button>
+  <button onclick="decryptData()"> Decrypt</button>
+
+  <h3>Encrypted Output:</h3>
+  <textarea id="encrypted-output" rows="4" cols="50" readonly></textarea>
+
+  <h3>Decrypted Output:</h3>
+  <textarea id="decrypted-output" "rows="4" cols="50" readonly></textarea>
+
+  <script>
+	async function getKey(password, salt) {
+	  //Step 1: Import the password as raw key material
+	  const keyMaterial = await crypto.subtle.importKey(
+	    "raw",
+	     new TextEncoder().encode(password),
+	     { name: "PBKDF2" },
+	     false,
+	     ["deriveKey"]
+	   );
+
+	 //Step 2: Use PBKDF2 to derive a strong 256-bit AES key
+	 return crypto.subtle.deriveKey(
+	   {
+	      name: "PBKDF2",
+	      salt: salt,
+	      iterations: 100000,
+	      hash: "SHA-256"
+    	    },
+	    keyMaterial,
+	    { name: "AES-GCM", length: 256 },
+	    false,
+	    ["encrypt", "decrypt"]
+	  );
+	}
+	async function encryptData() {
+	  //Get the password and message from the page
+	  const password = document.getElementById("password").value;
+	  const plaintext = document.getElementById("plaintext").value;
+
+	  if (!password) { alert("Please enter a password"); return; }
+	  if (!plaintext) { alert("Please enter a message to encrypt"); return; }
+
+	  // Generate a random salt (16 bytes) and IV (12 bytes)
+	  // These are NOT secret - they get stored with the encrypted data
+	  const salt = crypto.getRandomValues(new Uint8Array(16));
+	  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+	  //Use getKey to derive our AES-256 key from the password + salt
+	  const key = await getKey(password, salt);
+
+	  // Encrypt the plaintext
+	  const encoded = new TextEncoder().encode(plaintext);
+	  const encrypted = await crypto.subtle.encrypt(
+	    { name: "AES-GCM", iv: iv},
+	    key,
+	    encoded
+	  );
+	  
+  	  // Bundle salt + IV + encrypted data together
+	  // We need salt and IV later to decrypt - they are not secret
+	 const encryptedArray = new Uint8Array(encrypted);
+	 const bundle = new Uint8Array(salt.byteLength + iv.byteLength + encryptedArray.byteLength);
+	 bundle.set(salt, 0);
+	 bundle.set(iv, salt.byteLength);
+	 bundle.set(encryptedArray, salt.byteLength +iv.byteLength);
+
+	 //Convert to base64 so it displays as readable text
+	 const base64 = btoa(String.fromCharCode(...bundle));
+
+	 // Show in the output box
+	 document.getElementById("encrypted-output").value = base64;
+
+	}
+	async function decryptData() {
+	  const password	= document.getElementById("password").value;
+	  const base64		= document.getElementById("encrypted-output").value;
+	  
+	  if (!password) { alert("Please enter your password"); return; }
+	  if (!base64)	 { alert("No encrypted data to decrypt"); return; }
+
+	  // Convert base64 back to bytes
+  	  const bundle = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+
+  	 // Unpack the bundle — salt is first 16 bytes, IV is next 12, rest is data
+  	 const salt      = bundle.slice(0, 16);
+ 	 const iv        = bundle.slice(16, 28);
+  	 const encrypted = bundle.slice(28);
+
+  	// Re-derive the same key using the same password + salt
+  	 const key = await getKey(password, salt);
+
+  	// Decrypt
+  	try {
+    	const decrypted = await crypto.subtle.decrypt(
+      	   { name: "AES-GCM", iv: iv },
+     	   key,
+      	   encrypted
+    	 );
+
+    	// Convert bytes back to text
+    	 const plaintext = new TextDecoder().decode(decrypted);
+    	 document.getElementById("decrypted-output").value = plaintext;
+
+ 	 } catch (e) {
+    	 document.getElementById("decrypted-output").value = "❌ Decryption failed — wrong password or data was tampered with.";
+  	}
+}
+
+  </script>
+
+</body>
+</html>
